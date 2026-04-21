@@ -16,7 +16,9 @@ import { getCachedSolUsd, refreshSolUsdIfStale } from "./util/sol-usd.js";
 const PORT = Number(
   process.env.PORT ?? process.env.SIGNAL_HTTP_PORT ?? 3847,
 );
-const MAX_ALERTS_PER_DAY = Number(process.env.SIGNAL_MAX_ALERTS_PER_DAY ?? 100);
+// Default budget is intentionally permissive so the /signal page is lively out
+// of the box. Tighten via SIGNAL_MAX_ALERTS_PER_DAY once you calibrate rules.
+const MAX_ALERTS_PER_DAY = Number(process.env.SIGNAL_MAX_ALERTS_PER_DAY ?? 2000);
 
 async function main() {
   await refreshSolUsdIfStale();
