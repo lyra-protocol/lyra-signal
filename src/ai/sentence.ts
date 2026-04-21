@@ -34,6 +34,7 @@ export async function generateSentence(
     "Skip USD amounts under $500 (they're noise). Always mention the token name/symbol when known.",
     'Frame "why it matters" in the sentence — creation, whale footprint, cluster rotation, or volume surge.',
     'If action is "create", describe it as a launch with any relevant pump metadata (name, MCap if present).',
+    'If rule is bonding_migration or action is migrate, describe the pool graduation / Raydium move plainly.',
     "Do NOT restate the rule name, score, or severity. Write as if the reader already knows the rail.",
   ].join(" ");
 
@@ -69,6 +70,13 @@ export async function generateSentence(
     temperature: 0.4,
   };
 
+  const llmTimeoutMs = Math.min(
+    25_000,
+    Math.max(4_000, Number(process.env.SIGNAL_LLM_TIMEOUT_MS ?? 12_000) || 12_000),
+  );
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), llmTimeoutMs);
+
   try {
     const res = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
@@ -77,7 +85,9 @@ export async function generateSentence(
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify(body),
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
     if (!res.ok) {
       const err = await res.text();
       console.error(
@@ -92,6 +102,7 @@ export async function generateSentence(
     const cleaned = sanitizeSentence(raw);
     return cleaned || fallbackSentence(alert, wallet);
   } catch (error) {
+    clearTimeout(timeout);
     console.error("[sentence] request failed", error);
     return fallbackSentence(alert, wallet);
   }

@@ -5,7 +5,7 @@ import {
   type NormalizedEvent,
 } from "../schema/events.js";
 import { DailyAlertBudget } from "./daily-budget.js";
-import { evaluateRules } from "./rules.js";
+import { evaluateRules, VOLUME_REPEAT_MS } from "./rules.js";
 import type { EarlyBuysTracker } from "./state/early-buys-tracker.js";
 import type { VolumeWindow } from "./state/volume-window.js";
 import { incrementMetric } from "../util/metrics.js";
@@ -21,6 +21,7 @@ export function createFilterPipeline(options: {
   volumeByToken: Map<string, VolumeWindow>;
 }): FilterPipeline {
   const budget = new DailyAlertBudget(options.maxAlertsPerDay);
+  const lastVolumeSurgeAt = new Map<string, number>();
 
   return {
     accept(event, score) {
@@ -29,6 +30,16 @@ export function createFilterPipeline(options: {
         volumeByToken: options.volumeByToken,
       });
       if (!match || !rule) return null;
+
+      if (rule === "volume_acceleration" && VOLUME_REPEAT_MS > 0) {
+        const prev = lastVolumeSurgeAt.get(event.token);
+        const t = event.timestampMs;
+        if (prev !== undefined && t - prev < VOLUME_REPEAT_MS) {
+          return null;
+        }
+        lastVolumeSurgeAt.set(event.token, t);
+      }
+
       incrementMetric("ruleMatched");
       if (!budget.tryConsume()) {
         incrementMetric("budgetDropped");

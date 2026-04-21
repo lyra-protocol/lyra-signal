@@ -38,7 +38,9 @@ export interface NormalizedEvent {
 export type RuleId =
   | "large_wallet_usd"
   | "early_buy_index"
-  | "volume_acceleration";
+  | "volume_acceleration"
+  /** PumpPortal bonding-curve → pool migration (Raydium, etc.). */
+  | "bonding_migration";
 
 export type Severity = "info" | "notable" | "alert" | "critical";
 
@@ -81,6 +83,8 @@ export function deriveSeverity(
 
   if (rule === "volume_acceleration" && usd >= 10_000) return "alert";
   if (rule === "volume_acceleration" && usd >= 1_000) return "notable";
+
+  if (rule === "bonding_migration") return "notable";
 
   if (typeof score === "number") {
     if (score >= 75) return "alert";

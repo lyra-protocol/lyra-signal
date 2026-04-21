@@ -7,8 +7,8 @@ export function passesScoreGate(scored: ScoredEvent, minScore: number): boolean 
 
 export function readMinPumpScoreFromEnv(): number {
   // Default lifts the signal/noise ratio — the scoring engine already maxes at
-  // ~100, so 40 is roughly "passable trade, not dust" without being too tight.
-  const v = Number(process.env.SCORE_MIN_PUMP ?? 40);
-  if (!Number.isFinite(v)) return 40;
+  // ~100; 42 trims a bit more churn than 40 while staying permissive.
+  const v = Number(process.env.SCORE_MIN_PUMP ?? 42);
+  if (!Number.isFinite(v)) return 42;
   return Math.max(0, Math.min(100, v));
 }
