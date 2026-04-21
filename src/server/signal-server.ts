@@ -11,6 +11,14 @@ import {
   ACCEL_RATIO,
   VOLUME_WINDOW_MS,
 } from "../filter/rules.js";
+import { readMinPumpScoreFromEnv } from "../scoring/gate.js";
+
+function readOptionalDailyCapForDiag(): number {
+  const raw = process.env.SIGNAL_MAX_ALERTS_PER_DAY;
+  if (raw === undefined || raw === "") return 0;
+  const v = Number(raw);
+  return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
+}
 
 export interface SignalServer {
   listen(port: number): Promise<void>;
@@ -30,21 +38,36 @@ export function createSignalServer(bus: SignalBus): SignalServer {
     }
     if (req.url === "/diag" || req.url?.startsWith("/diag?")) {
       res.writeHead(200, { "content-type": "application/json" });
+      const metrics = snapshotMetrics();
+      const maxAlertsPerDay = readOptionalDailyCapForDiag();
+      const capActive = maxAlertsPerDay > 0;
+      const capReached =
+        capActive && metrics.counts.alertsPublished >= maxAlertsPerDay;
       res.end(
         JSON.stringify(
           {
             ok: true,
             service: "lyra-signal",
-            metrics: snapshotMetrics(),
+            metrics,
+            budget: capActive
+              ? {
+                  mode: "capped" as const,
+                  maxPerDay: maxAlertsPerDay,
+                  published: metrics.counts.alertsPublished,
+                  droppedAfterCap: metrics.counts.budgetDropped,
+                  capReached,
+                  note: capReached
+                    ? "Cap reached for this UTC day (or until restart). Raise SIGNAL_MAX_ALERTS_PER_DAY or remove it."
+                    : undefined,
+                }
+              : { mode: "unlimited" as const },
             config: {
               largeUsd: LARGE_USD,
               maxEarlyBuyIndex: MAX_EARLY_BUY_INDEX,
               accelRatio: ACCEL_RATIO,
               volumeWindowMs: VOLUME_WINDOW_MS,
-              scoreMinPump: Number(process.env.SCORE_MIN_PUMP ?? 0),
-              maxAlertsPerDay: Number(
-                process.env.SIGNAL_MAX_ALERTS_PER_DAY ?? 2000,
-              ),
+              scoreMinPump: readMinPumpScoreFromEnv(),
+              maxAlertsPerDay: capActive ? maxAlertsPerDay : null,
               mockIngest: process.env.MOCK_INGEST === "1",
               pumpWorkerEnabled:
                 process.env.PUMP_WORKER_ENABLED !== "0" &&

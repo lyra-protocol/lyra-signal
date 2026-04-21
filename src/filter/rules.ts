@@ -19,13 +19,13 @@ function num(envKey: string, fallback: number): number {
   return Number.isFinite(v) && v > 0 ? v : fallback;
 }
 
-// Noise floor — tuned to reduce duplicate “surge” spam while keeping launches visible.
-export const DEFAULT_LARGE_USD = 3_500;
-export const DEFAULT_MAX_EARLY_BUY_INDEX = 7;
-export const DEFAULT_ACCEL_RATIO = 2.8;
+// Noise floor — no daily cap; quality comes from SCORE_MIN_PUMP + these rails.
+export const DEFAULT_LARGE_USD = 4_200;
+export const DEFAULT_MAX_EARLY_BUY_INDEX = 6;
+export const DEFAULT_ACCEL_RATIO = 3.0;
 export const DEFAULT_VOLUME_WINDOW_MS = 60_000;
 /** Suppress repeat volume_acceleration for the same mint within this window. */
-export const DEFAULT_VOLUME_REPEAT_MS = 15_000;
+export const DEFAULT_VOLUME_REPEAT_MS = 20_000;
 
 export const LARGE_USD = num("SIGNAL_LARGE_USD", DEFAULT_LARGE_USD);
 export const MAX_EARLY_BUY_INDEX = num(

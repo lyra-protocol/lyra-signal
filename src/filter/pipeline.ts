@@ -11,16 +11,29 @@ import type { VolumeWindow } from "./state/volume-window.js";
 import { incrementMetric } from "../util/metrics.js";
 
 export interface FilterPipeline {
-  /** Returns null if dropped by rules or daily cap. */
+  /** Returns null if dropped by rules or optional daily cap. */
   accept(event: NormalizedEvent, score?: number): AlertEnvelope | null;
 }
 
+/** Daily cap is off unless SIGNAL_MAX_ALERTS_PER_DAY is a positive number. */
+function readOptionalDailyCap(): number {
+  const raw = process.env.SIGNAL_MAX_ALERTS_PER_DAY;
+  if (raw === undefined || raw === "") return 0;
+  const v = Number(raw);
+  return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
+}
+
 export function createFilterPipeline(options: {
-  maxAlertsPerDay: number;
   earlyBuys: EarlyBuysTracker;
   volumeByToken: Map<string, VolumeWindow>;
+  /** Override env. ≤0 = unlimited (default). */
+  maxAlertsPerDay?: number;
 }): FilterPipeline {
-  const budget = new DailyAlertBudget(options.maxAlertsPerDay);
+  const cap =
+    options.maxAlertsPerDay !== undefined
+      ? Math.max(0, options.maxAlertsPerDay)
+      : readOptionalDailyCap();
+  const budget = cap > 0 ? new DailyAlertBudget(cap) : null;
   const lastVolumeSurgeAt = new Map<string, number>();
 
   return {
@@ -41,7 +54,7 @@ export function createFilterPipeline(options: {
       }
 
       incrementMetric("ruleMatched");
-      if (!budget.tryConsume()) {
+      if (budget && !budget.tryConsume()) {
         incrementMetric("budgetDropped");
         return null;
       }

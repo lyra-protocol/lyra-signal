@@ -13,25 +13,18 @@ import { processPumpPipeline } from "./pipeline/process-pump.js";
 import { startPumpWorker } from "./sources/pump/worker.js";
 import { startHeartbeatPublisher } from "./pipeline/heartbeat.js";
 import { getCachedSolUsd, refreshSolUsdIfStale } from "./util/sol-usd.js";
+import { readMinPumpScoreFromEnv } from "./scoring/gate.js";
 
 const PORT = Number(
   process.env.PORT ?? process.env.SIGNAL_HTTP_PORT ?? 3847,
 );
-// Default budget is intentionally permissive so the /signal page is lively out
-// of the box. Tighten via SIGNAL_MAX_ALERTS_PER_DAY once you calibrate rules.
-const MAX_ALERTS_PER_DAY = Number(process.env.SIGNAL_MAX_ALERTS_PER_DAY ?? 2000);
-
 async function main() {
   await refreshSolUsdIfStale();
 
   const bus = createSignalBus();
   const earlyBuys = new EarlyBuysTracker();
   const volumeByToken = new Map<string, VolumeWindow>();
-  const pipeline = createFilterPipeline({
-    maxAlertsPerDay: MAX_ALERTS_PER_DAY,
-    earlyBuys,
-    volumeByToken,
-  });
+  const pipeline = createFilterPipeline({ earlyBuys, volumeByToken });
 
   const server = createSignalServer(bus);
   await server.listen(PORT);
@@ -70,7 +63,7 @@ async function main() {
     });
   } else if (pumpEnabled) {
     const ac = new AbortController();
-    const minScore = process.env.SCORE_MIN_PUMP ?? "0";
+    const minScore = readMinPumpScoreFromEnv();
     console.error(
       `[pump] worker starting (SCORE_MIN_PUMP=${minScore}; drops below gate before rules/LLM)`,
     );

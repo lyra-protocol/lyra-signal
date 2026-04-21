@@ -6,9 +6,8 @@ export function passesScoreGate(scored: ScoredEvent, minScore: number): boolean 
 }
 
 export function readMinPumpScoreFromEnv(): number {
-  // Default lifts the signal/noise ratio — the scoring engine already maxes at
-  // ~100; 42 trims a bit more churn than 40 while staying permissive.
-  const v = Number(process.env.SCORE_MIN_PUMP ?? 42);
-  if (!Number.isFinite(v)) return 42;
+  // Primary noise gate when there is no per-day cap (default 46).
+  const v = Number(process.env.SCORE_MIN_PUMP ?? 46);
+  if (!Number.isFinite(v)) return 46;
   return Math.max(0, Math.min(100, v));
 }
