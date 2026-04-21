@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { WebSocketServer } from "ws";
 import type { SignalBus } from "../bus/signal-bus.js";
 import type { AlertEnvelope } from "../schema/events.js";
+import { resolveListenHost } from "../util/listen-host.js";
 
 export interface SignalServer {
   listen(port: number): Promise<void>;
@@ -64,7 +65,7 @@ export function createSignalServer(bus: SignalBus): SignalServer {
     listen(port) {
       return new Promise((resolve, reject) => {
         httpServer.once("error", reject);
-        const host = process.env.HOST ?? "0.0.0.0";
+        const host = resolveListenHost();
         httpServer.listen(port, host, () => resolve());
       });
     },
