@@ -4,6 +4,13 @@ import { WebSocketServer } from "ws";
 import type { SignalBus } from "../bus/signal-bus.js";
 import type { AlertEnvelope } from "../schema/events.js";
 import { resolveListenHost } from "../util/listen-host.js";
+import { snapshotMetrics } from "../util/metrics.js";
+import {
+  LARGE_USD,
+  MAX_EARLY_BUY_INDEX,
+  ACCEL_RATIO,
+  VOLUME_WINDOW_MS,
+} from "../filter/rules.js";
 
 export interface SignalServer {
   listen(port: number): Promise<void>;
@@ -19,6 +26,35 @@ export function createSignalServer(bus: SignalBus): SignalServer {
     if (req.url === "/health" || req.url === "/") {
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({ ok: true, service: "lyra-signal" }));
+      return;
+    }
+    if (req.url === "/diag" || req.url?.startsWith("/diag?")) {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify(
+          {
+            ok: true,
+            service: "lyra-signal",
+            metrics: snapshotMetrics(),
+            config: {
+              largeUsd: LARGE_USD,
+              maxEarlyBuyIndex: MAX_EARLY_BUY_INDEX,
+              accelRatio: ACCEL_RATIO,
+              volumeWindowMs: VOLUME_WINDOW_MS,
+              scoreMinPump: Number(process.env.SCORE_MIN_PUMP ?? 0),
+              maxAlertsPerDay: Number(
+                process.env.SIGNAL_MAX_ALERTS_PER_DAY ?? 2000,
+              ),
+              mockIngest: process.env.MOCK_INGEST === "1",
+              pumpWorkerEnabled:
+                process.env.PUMP_WORKER_ENABLED !== "0" &&
+                process.env.MOCK_INGEST !== "1",
+            },
+          },
+          null,
+          2,
+        ),
+      );
       return;
     }
     res.writeHead(404);

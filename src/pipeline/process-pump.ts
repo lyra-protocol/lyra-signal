@@ -7,6 +7,7 @@ import {
   readMinPumpScoreFromEnv,
   scorePumpEvent,
 } from "../scoring/index.js";
+import { incrementMetric } from "../util/metrics.js";
 import { dispatchNormalizedEvent } from "./handle-event.js";
 
 /**
@@ -22,6 +23,7 @@ export async function processPumpPipeline(
   const scored = scorePumpEvent(event, ctx);
   const min = readMinPumpScoreFromEnv();
   if (!passesScoreGate(scored, min)) {
+    incrementMetric("pumpScoreDropped");
     if (process.env.SIGNAL_DEBUG_SCORE === "1") {
       console.error(
         "[score:drop]",

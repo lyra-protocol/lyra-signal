@@ -2,6 +2,7 @@ import WebSocket from "ws";
 import type { NormalizedEvent } from "../../schema/events.js";
 import { parsePumpPortalMessage } from "../../pump/parse.js";
 import { RecentDedupe } from "../../pump/recent-dedupe.js";
+import { incrementMetric, setPumpWorkerState } from "../../util/metrics.js";
 
 const DEFAULT_WS = "wss://pumpportal.fun/api/data";
 const MAX_TRACKED_MINT_TRADES = 400;
@@ -26,36 +27,48 @@ export function startPumpWorker(options: PumpWorkerOptions): void {
   let active: WebSocket | null = null;
   const subscribedMints = new Set<string>();
 
+  let reconnectCount = 0;
   const scheduleReconnect = () => {
     if (options.signal.aborted) return;
     clearTimeout(reconnectTimer);
+    reconnectCount += 1;
+    setPumpWorkerState({ reconnects: reconnectCount });
     reconnectTimer = setTimeout(connect, 3500);
   };
 
   const connect = () => {
     if (options.signal.aborted) return;
 
+    setPumpWorkerState({ state: "connecting" });
     const ws = new WebSocket(wsUrl);
     active = ws;
 
     ws.on("open", () => {
       console.error("[pump] connected → subscribeNewToken + subscribeMigration");
+      setPumpWorkerState({
+        state: "open",
+        lastOpenAt: new Date().toISOString(),
+        lastError: null,
+      });
       ws.send(JSON.stringify({ method: "subscribeNewToken" }));
       ws.send(JSON.stringify({ method: "subscribeMigration" }));
     });
 
     ws.on("message", (data) => {
+      incrementMetric("pumpFramesReceived");
       const raw = String(data);
       const sol = options.getSolUsd();
       const ev = parsePumpPortalMessage(raw, sol);
       if (!ev) return;
 
       if (ev.dedupeKey && dedupe.checkAndSet(ev.dedupeKey)) return;
+      incrementMetric("pumpEventsParsed");
 
       if (ev.action === "create" && ev.token) {
         if (subscribedMints.size < MAX_TRACKED_MINT_TRADES) {
           if (!subscribedMints.has(ev.token)) {
             subscribedMints.add(ev.token);
+            setPumpWorkerState({ subscribedMints: subscribedMints.size });
             ws.send(
               JSON.stringify({
                 method: "subscribeTokenTrade",
@@ -73,12 +86,26 @@ export function startPumpWorker(options: PumpWorkerOptions): void {
 
     ws.on("close", (code, reason) => {
       active = null;
-      console.error("[pump] closed", code, String(reason));
+      const reasonText = String(reason ?? "");
+      console.error("[pump] closed", code, reasonText);
+      setPumpWorkerState({
+        state: "closed",
+        lastCloseAt: new Date().toISOString(),
+        lastError: reasonText || `code ${code}`,
+        reconnects: (setPumpWorkerState as unknown as { _reconnects?: number })
+          ._reconnects
+          ? 0
+          : 0,
+      });
       scheduleReconnect();
     });
 
     ws.on("error", (err) => {
       console.error("[pump] socket error", err);
+      setPumpWorkerState({
+        state: "error",
+        lastError: err instanceof Error ? err.message : String(err),
+      });
     });
   };
 

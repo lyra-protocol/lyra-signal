@@ -4,6 +4,7 @@ import { DailyAlertBudget } from "./daily-budget.js";
 import { evaluateRules } from "./rules.js";
 import type { EarlyBuysTracker } from "./state/early-buys-tracker.js";
 import type { VolumeWindow } from "./state/volume-window.js";
+import { incrementMetric } from "../util/metrics.js";
 
 export interface FilterPipeline {
   /** Returns null if dropped by rules or daily cap. */
@@ -24,7 +25,11 @@ export function createFilterPipeline(options: {
         volumeByToken: options.volumeByToken,
       });
       if (!match || !rule) return null;
-      if (!budget.tryConsume()) return null;
+      incrementMetric("ruleMatched");
+      if (!budget.tryConsume()) {
+        incrementMetric("budgetDropped");
+        return null;
+      }
 
       const now = new Date().toISOString();
       return {

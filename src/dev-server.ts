@@ -11,6 +11,7 @@ import { makeEvent } from "./sources/normalize.js";
 import { dispatchNormalizedEvent } from "./pipeline/handle-event.js";
 import { processPumpPipeline } from "./pipeline/process-pump.js";
 import { startPumpWorker } from "./sources/pump/worker.js";
+import { startHeartbeatPublisher } from "./pipeline/heartbeat.js";
 import { getCachedSolUsd, refreshSolUsdIfStale } from "./util/sol-usd.js";
 
 const PORT = Number(
@@ -35,8 +36,13 @@ async function main() {
   const server = createSignalServer(bus);
   await server.listen(PORT);
   console.error(
-    `lyra-signal listening on port ${PORT} (health /, ws /feed) — use PORT or SIGNAL_HTTP_PORT`,
+    `lyra-signal listening on port ${PORT} (health /, diag /diag, ws /feed) — use PORT or SIGNAL_HTTP_PORT`,
   );
+
+  const heartbeatAbort = new AbortController();
+  startHeartbeatPublisher({ bus, signal: heartbeatAbort.signal });
+  process.on("SIGINT", () => heartbeatAbort.abort());
+  process.on("SIGTERM", () => heartbeatAbort.abort());
 
   const pumpEnabled =
     process.env.PUMP_WORKER_ENABLED !== "0" && process.env.MOCK_INGEST !== "1";

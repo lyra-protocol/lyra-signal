@@ -3,6 +3,7 @@ import type { FilterPipeline } from "../filter/pipeline.js";
 import type { NormalizedEvent } from "../schema/events.js";
 import { generateSentence } from "../ai/sentence.js";
 import type { WalletContext } from "../ai/sentence.js";
+import { incrementMetric } from "../util/metrics.js";
 
 /**
  * End-to-end: normalize → filter → (optional wallet ctx) → LLM → broadcast.
@@ -19,4 +20,5 @@ export async function dispatchNormalizedEvent(
 
   const sentence = await generateSentence(accepted, walletContext);
   bus.publish({ ...accepted, sentence });
+  incrementMetric("alertsPublished");
 }
