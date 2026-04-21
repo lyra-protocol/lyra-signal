@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lyra Signal</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 42rem;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        line-height: 1.5;
+        color: #111;
+      }
+      code {
+        background: #f4f4f5;
+        padding: 0.15rem 0.35rem;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Lyra Signal</h1>
+    <p>
+      The realtime signal API (WebSocket + Pump.fun ingestion) runs on a
+      <strong>long-lived host</strong> (e.g. Railway / Fly / Render), not on Vercel
+      serverless — see project <code>DEPLOY.md</code>.
+    </p>
+    <p>
+      Point your UI at the deployed backend: <code>wss://YOUR_HOST/feed</code> and
+      <code>https://YOUR_HOST/health</code>.
+    </p>
+  </body>
+</html>

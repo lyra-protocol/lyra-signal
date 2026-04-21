@@ -1,0 +1,13 @@
+# https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: lyra-signal
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: starter
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
