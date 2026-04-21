@@ -22,6 +22,7 @@ function buildHeartbeat(): AlertEnvelope {
   return {
     id: randomUUID(),
     primaryRule: "volume_acceleration",
+    severity: "info",
     sentence: `Heartbeat · pipeline online · SOL $${sol.toFixed(2)} · ${now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`,
     createdAt: now.toISOString(),
     event: {

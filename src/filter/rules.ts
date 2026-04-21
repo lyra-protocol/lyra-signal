@@ -18,9 +18,11 @@ function num(envKey: string, fallback: number): number {
   return Number.isFinite(v) && v > 0 ? v : fallback;
 }
 
-export const DEFAULT_LARGE_USD = 500;
-export const DEFAULT_MAX_EARLY_BUY_INDEX = 250;
-export const DEFAULT_ACCEL_RATIO = 1.5;
+// Noise floor tuned for "one sentence that matters" product brief.
+// Tighten by env if a desk wants fewer alerts.
+export const DEFAULT_LARGE_USD = 2_000;
+export const DEFAULT_MAX_EARLY_BUY_INDEX = 10;
+export const DEFAULT_ACCEL_RATIO = 2.5;
 export const DEFAULT_VOLUME_WINDOW_MS = 60_000;
 
 export const LARGE_USD = num("SIGNAL_LARGE_USD", DEFAULT_LARGE_USD);

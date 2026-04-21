@@ -14,8 +14,9 @@ export async function dispatchNormalizedEvent(
   pipeline: FilterPipeline,
   bus: SignalBus,
   walletContext: WalletContext | null,
+  score?: number,
 ): Promise<void> {
-  const accepted = pipeline.accept(event);
+  const accepted = pipeline.accept(event, score);
   if (!accepted) return;
 
   const sentence = await generateSentence(accepted, walletContext);

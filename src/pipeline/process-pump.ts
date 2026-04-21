@@ -38,5 +38,5 @@ export async function processPumpPipeline(
     return;
   }
 
-  await dispatchNormalizedEvent(event, pipeline, bus, null);
+  await dispatchNormalizedEvent(event, pipeline, bus, null, scored.score);
 }
