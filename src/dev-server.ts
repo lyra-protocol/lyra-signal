@@ -7,6 +7,9 @@ import { createFilterPipeline } from "./filter/pipeline.js";
 import { EarlyBuysTracker } from "./filter/state/early-buys-tracker.js";
 import type { VolumeWindow } from "./filter/state/volume-window.js";
 import { createSignalServer } from "./server/signal-server.js";
+import { createRecentAlertStore } from "./recent/recent-alert-store.js";
+import { createBirdeyeSignalEngine } from "./birdeye/worker.js";
+import { startTelegramBot } from "./telegram/bot.js";
 import { makeEvent } from "./sources/normalize.js";
 import { dispatchNormalizedEvent } from "./pipeline/handle-event.js";
 import { processPumpPipeline } from "./pipeline/process-pump.js";
@@ -22,20 +25,24 @@ async function main() {
   await refreshSolUsdIfStale();
 
   const bus = createSignalBus();
+  const recentStore = createRecentAlertStore();
   const earlyBuys = new EarlyBuysTracker();
   const volumeByToken = new Map<string, VolumeWindow>();
   const pipeline = createFilterPipeline({ earlyBuys, volumeByToken });
 
-  const server = createSignalServer(bus);
+  const server = createSignalServer(bus, recentStore);
   await server.listen(PORT);
   console.error(
     `lyra-signal listening on port ${PORT} (health /, diag /diag, ws /feed) — use PORT or SIGNAL_HTTP_PORT`,
   );
 
-  const heartbeatAbort = new AbortController();
-  startHeartbeatPublisher({ bus, signal: heartbeatAbort.signal });
-  process.on("SIGINT", () => heartbeatAbort.abort());
-  process.on("SIGTERM", () => heartbeatAbort.abort());
+  const serviceAbort = new AbortController();
+  startHeartbeatPublisher({ bus, signal: serviceAbort.signal });
+  const birdeyeEngine = createBirdeyeSignalEngine(bus);
+  birdeyeEngine?.start(serviceAbort.signal);
+  startTelegramBot({ bus, signal: serviceAbort.signal, birdeyeEngine });
+  process.on("SIGINT", () => serviceAbort.abort());
+  process.on("SIGTERM", () => serviceAbort.abort());
 
   const pumpEnabled =
     process.env.PUMP_WORKER_ENABLED !== "0" && process.env.MOCK_INGEST !== "1";

@@ -72,3 +72,43 @@ docker run --env-file lyra-signal/.env -p 3847:3847 lyra-signal
 ## Connecting lyra-ui
 
 Set `NEXT_PUBLIC_SIGNAL_WS_URL` (or your chosen name) to `wss://YOUR_BACKEND_HOST/feed` in the Next app’s environment for the signal page.
+
+## Birdeye + Telegram production setup
+
+The Birdeye-powered worker runs inside this long-lived `lyra-signal` process, not in Vercel serverless.
+
+Required worker env vars:
+
+- `BIRDEYE_API_KEY` — Birdeye Data Services key.
+- `TELEGRAM_BOT_TOKEN` — BotFather token for Lyra Signal Bot.
+- `REDIS_URL` — optional but recommended; stores Telegram subscribers/preferences across restarts.
+
+Useful tuning vars:
+
+- `BIRDEYE_WORKER_ENABLED=1`
+- `BIRDEYE_CANDIDATE_LIMIT=8`
+- `BIRDEYE_MIN_SAFETY_SCORE=70`
+- `BIRDEYE_MIN_LIQUIDITY_USD=5000`
+- `BIRDEYE_TRENDING_INTERVAL_MS=30000`
+- `BIRDEYE_NEW_LISTING_INTERVAL_MS=60000`
+
+The worker exposes recent alerts at:
+
+```text
+GET https://YOUR_SIGNAL_HOST/api/signals/recent?limit=20
+```
+
+The WebSocket feed remains:
+
+```text
+wss://YOUR_SIGNAL_HOST/feed
+```
+
+## Connecting lyra-ui
+
+Set these in the Vercel project for `lyra-ui`:
+
+- `NEXT_PUBLIC_LYRA_SIGNAL_URL=wss://YOUR_SIGNAL_HOST` (client live feed)
+- `LYRA_SIGNAL_URL=https://YOUR_SIGNAL_HOST` (server proxy for `/api/signals/recent`)
+- `TELEGRAM_BOT_TOKEN` (server-only, used by `/api/telegram/bot` to resolve the `t.me` link)
+- Optional: `NEXT_PUBLIC_LYRA_TELEGRAM_BOT_URL=https://t.me/YOUR_BOT_USERNAME`

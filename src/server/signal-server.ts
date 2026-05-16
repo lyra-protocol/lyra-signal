@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { WebSocketServer } from "ws";
 import type { SignalBus } from "../bus/signal-bus.js";
 import type { AlertEnvelope } from "../schema/events.js";
+import type { RecentAlertStore } from "../recent/recent-alert-store.js";
 import { resolveListenHost } from "../util/listen-host.js";
 import { snapshotMetrics } from "../util/metrics.js";
 import {
@@ -20,6 +21,25 @@ function readOptionalDailyCapForDiag(): number {
   return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
 }
 
+function readRecentOptions(url: string) {
+  const parsed = new URL(url, "http://localhost");
+  const limit = Number(parsed.searchParams.get("limit") ?? 20);
+  const includeSystem = parsed.searchParams.get("includeSystem") === "1";
+  return { limit, includeSystem };
+}
+
+function writeCors(res: import("node:http").ServerResponse) {
+  res.setHeader("access-control-allow-origin", "*");
+  res.setHeader("access-control-allow-methods", "GET,OPTIONS");
+  res.setHeader("access-control-allow-headers", "content-type");
+}
+
+function writeJson(res: import("node:http").ServerResponse, body: unknown) {
+  writeCors(res);
+  res.writeHead(200, { "content-type": "application/json" });
+  res.end(JSON.stringify(body));
+}
+
 export interface SignalServer {
   listen(port: number): Promise<void>;
   close(): Promise<void>;
@@ -29,14 +49,28 @@ export interface SignalServer {
  * HTTP + WebSocket on the same port. WS path `/feed`.
  * Latency: zero queue between bus.publish and ws.send (same tick).
  */
-export function createSignalServer(bus: SignalBus): SignalServer {
+export function createSignalServer(bus: SignalBus, recentStore?: RecentAlertStore): SignalServer {
   const httpServer = createServer((req, res) => {
+    if (req.method === "OPTIONS") {
+      writeCors(res);
+      res.writeHead(204);
+      res.end();
+      return;
+    }
     if (req.url === "/health" || req.url === "/") {
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({ ok: true, service: "lyra-signal" }));
       return;
     }
+    if (req.url?.startsWith("/api/signals/recent")) {
+      writeJson(res, {
+        ok: true,
+        signals: recentStore?.list(readRecentOptions(req.url)) ?? [],
+      });
+      return;
+    }
     if (req.url === "/diag" || req.url?.startsWith("/diag?")) {
+      writeCors(res);
       res.writeHead(200, { "content-type": "application/json" });
       const metrics = snapshotMetrics();
       const maxAlertsPerDay = readOptionalDailyCapForDiag();
@@ -97,6 +131,7 @@ export function createSignalServer(bus: SignalBus): SignalServer {
   });
 
   const unsubscribe = bus.subscribe((alert: AlertEnvelope) => {
+    recentStore?.add(alert);
     const payload = JSON.stringify({ type: "alert", payload: alert });
     for (const client of wss.clients) {
       if (client.readyState === 1) client.send(payload);

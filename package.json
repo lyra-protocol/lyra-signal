@@ -12,6 +12,8 @@
     "test": "node --import tsx --test src/scoring/algorithm/core.test.ts"
   },
   "dependencies": {
+    "ioredis": "^5.10.1",
+    "telegraf": "^4.16.3",
     "tsx": "^4.19.2",
     "ws": "^8.18.0"
   },

@@ -3,7 +3,7 @@
  * Alerts are what cross the filter + get copy from the LLM.
  */
 
-export type SourceId = "pump" | "dexscreener" | "gmgn";
+export type SourceId = "pump" | "dexscreener" | "gmgn" | "birdeye";
 
 export type TradeAction = "buy" | "sell" | "create" | "migrate" | "unknown";
 
@@ -32,6 +32,28 @@ export interface NormalizedEvent {
       pool?: string;
       txType?: string;
     };
+    birdeye?: {
+      signalType?: RuleId;
+      symbol?: string;
+      name?: string;
+      logoURI?: string;
+      liquidityUsd?: number;
+      marketCapUsd?: number;
+      holderCount?: number;
+      priceUsd?: number;
+      safetyScore?: number;
+      volume1hUsd?: number;
+      volume1hChangePercent?: number;
+      price1hChangePercent?: number;
+      price24hChangePercent?: number;
+      gainPercent?: number;
+      priceImpactPercent?: number;
+      volumeSurgeMultiple?: number;
+      traderPnlUsd?: number;
+      note?: string;
+      birdeyeUrl?: string;
+      chartUrl?: string;
+    };
   };
 }
 
@@ -40,7 +62,12 @@ export type RuleId =
   | "early_buy_index"
   | "volume_acceleration"
   /** PumpPortal bonding-curve → pool migration (Raydium, etc.). */
-  | "bonding_migration";
+  | "bonding_migration"
+  | "new_launch"
+  | "trending_breakout"
+  | "whale_move"
+  | "top_gainer"
+  | "momentum_spike";
 
 export type Severity = "info" | "notable" | "alert" | "critical";
 
@@ -85,6 +112,12 @@ export function deriveSeverity(
   if (rule === "volume_acceleration" && usd >= 1_000) return "notable";
 
   if (rule === "bonding_migration") return "notable";
+
+  if (rule === "new_launch") return (score ?? 0) >= 80 ? "alert" : "notable";
+  if (rule === "trending_breakout") return (score ?? 0) >= 85 ? "critical" : "alert";
+  if (rule === "whale_move") return usd >= 50_000 ? "critical" : "alert";
+  if (rule === "top_gainer") return (score ?? 0) >= 85 ? "critical" : "alert";
+  if (rule === "momentum_spike") return (score ?? 0) >= 85 ? "critical" : "alert";
 
   if (typeof score === "number") {
     if (score >= 75) return "alert";
